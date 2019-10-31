@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+	<meta charset="UTF-8">
+	<title>ONVIF Network Camera Manager</title>
+	<meta http-equiv="X-UA-Compatible" content="IE=edge">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<!-- jQuery -->
+	<script src="https://code.jquery.com/jquery-3.1.1.min.js"
+		integrity="sha256-hVVnYaiADRTO2PzUGmuLJr8BLUSjGIZsDYGmIJLv2b8=" crossorigin="anonymous"></script>
+	<!-- Bootstrap -->
+	<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css"
+		integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
+	<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap-theme.min.css"
+		integrity="sha384-rHyoN1iRsVXV4nD0JutlnGaslCJuC7uwjduW9SVrLvRYooPp2bWYgmgJQIXwl/Sp" crossorigin="anonymous">
+	<link href='https://unpkg.com/tailwindcss@^1.0/dist/tailwind.min.css' rel='stylesheet'>
+	<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"
+		integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous">
+	</script>
+	<!-- -->
+	<link href="style.css" rel="stylesheet">
+</head>
+
+<body>
+	<div id='app' class="flex flex-col">
+		<div class="navbar navbar-default navbar-fixed-top">
+			<div class="container">
+				<div class="navbar-header">
+					<h1><a class="navbar-brand" href="https://github.com/futomi/node-onvif" target="_blank">ONVIF
+							Network
+							Camera Manager</a></h1>
+				</div>
+			</div>
+			<div class="text-black text-center">
+				<label>Ipaddress:</label><input type="text" name="ipaddr" id="ipaddr" v-model="ipaddr">
+				<button class="border backage-gray-300"
+					@click="connect">{{device_connected ? 'disconnect':'connect'}}</button>
+			</div>
+		</div>
+
+		<div id="connected-device" class="flex flex-col">
+			<div class="container theme-showcase mt-10" role="main" id="main-wrapper">
+
+				<div class="text-white flex flex-col mx-6 my-4 absolute">
+					<div class="text-white"><input type="checkbox" name="checkface" id="checkface"
+							v-model="checkface">{{checkface ? 'กำลังตรวจจับใบหน้า':'หยุดตรวจจับใบหน้า'}}
+					</div>
+					<div class="text-white"><input type="checkbox" name="isdebug" v-model="isdebug"
+							id="isdebug">{{isdebug ? 'Debug Mode':' No Debug'}}</div>
+					<div class="text-white"><input type="checkbox" name="callapi" id="callapi" @change="updateallapi"
+							v-model="callapi">{{callapi ? 'บันทึกข้อมูลชอง Database':'หยุดการบันทึกข้อมูล'}}</div>
+
+				</div>
+				<div style="min-height:200px;">
+					<img id="imgx" :src="base64img" style="width:100%">
+					<img v-if="showimg" id="img" class="snapshot" src="">
+				</div>
+				<div class="mx-2 w-full text-white overflow-y-scroll"
+					:style=" 'max-height:' + (+window.height-150) + 'px;height:'+(+window.height-150)+'px;'">
+					<div v-for="(member,idx) in resultmembers" :key="idx">
+						--{{member.count}}-----{{member.t}}------------{{member.name}}---{{member.data.gender}}----
+					</div>
+				</div>
+				<div class="device-info-box"><span class="name"></span> (<span
+						class="address">{{this.device_connected ? this.selected_address:''}}</span>)</div>
+				<div class="ptz-ctl-box" v-show="showptz">
+					<div class="ptz-pad-box">
+						<button type="button" class="ptz-goto-home"><span
+								class="glyphicon glyphicon-home"></span></button>
+						<span class="left glyphicon glyphicon-menu-left"></span>
+						<span class="right glyphicon glyphicon-menu-right"></span>
+						<span class="up glyphicon glyphicon-menu-up"></span>
+						<span class="down glyphicon glyphicon-menu-down"></span>
+					</div>
+				</div>
+				<div v-show="showptz" class="ptz-spd-ctl-box">
+					<span class="label">PTZ speed for keyboard</span>
+					<div class="btn-group btn-group-sm" data-toggle="buttons">
+						<label class="btn btn-default"><input type="radio" name="ptz-speed" value="0.5"> slow</label>
+						<label class="btn btn-default"><input type="radio" name="ptz-speed" value="0.75"> medium</label>
+						<label class="btn btn-default active"><input type="radio" name="ptz-speed" value="1.0" checked>
+							fast</label>
+					</div>
+				</div>
+				<div v-show="showzoom" class="ptz-zom-ctl-box btn-group btn-group-lg" role="group" aria-label="Zoom">
+					<button type="button" class="ptz-zom ptz-zom-ot btn btn-default"><span
+							class="glyphicon glyphicon-zoom-out"></span></button>
+					<button type="button" class="ptz-zom ptz-zom-in btn btn-default"><span
+							class="glyphicon glyphicon-zoom-in"></span></button>
+				</div>
+				<div class="disconnect-box">
+					<button type="button" class="form-control btn btn-default" name="disconnect">Disconnect</button>
+				</div>
+			</div>
+		</div>
+
+		<div class="modal fade" tabindex="-1" role="dialog" id="message-modal">
+			<div class="modal-dialog" role="document">
+				<div class="modal-content">
+					<div class="modal-header">
+						<button type="button" class="close" data-dismiss="modal" aria-label="Close"><span
+								aria-hidden="true">&times;</span></button>
+						<h4 class="modal-title"></h4>
+					</div>
+					<div class="modal-body">
+						<p class="modal-message"></p>
+					</div>
+					<div class="modal-footer">
+						<button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+	<script defer src="/face-api.min.js"></script>
+	<script src='https://unpkg.com/axios/dist/axios.min.js'></script>
+	<script type="module" src="/main.mjs"> </script>
+	<script>
+		class Member {
+
+			constructor(member) {
+				this.created_at = new Date().valueOf();
+				this.updated_at = this.created_at;
+				this.member = member;
+				this.name = member.name;
+				console.log('---test---', this.created_at);
+				this.interval = setInterval(this.chktime.bind(this), 5000);
+			}
+
+			chktime() {
+				let a = new Date().valueOf();
+				console.log("---test--interval----", (+a - this.created_at));
+				if ((+a - this.updated_at) > 15000) {
+					console.log('----before---add or destroy---', window.callapi);
+					if (window.callapi) {
+						this.savemember();
+					} else {
+						console.log('------destroy----no save db');
+						this.destroy();
+					}
+				}
+			}
+			updatetime() {
+				this.updated_at = new Date().valueOf();
+			}
+
+			savemember() {
+				this.member.created_at = this.created_at;
+				this.member.updated_at = this.updated_at;
+				let url = "https://face.eventpass.co/api/addmemassets";
+				axios.post(url, JSON.stringify(this.member)).then(rs => {
+					console.log('---rs---add addmemassets---', rs);
+					this.destroy();
+				}).catch(console.error);
+			}
+
+			destroy() {
+				clearInterval(this.interval);
+				let index = ars.indexOf(this);
+				ars.splice(index, 1);
+				console.log('----end----');
+			}
+		}
+	</script>
+</body>
+
+</html>
